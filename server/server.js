@@ -3,7 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import connectDB from "./config/db.js";
-import User from "./models/User.js";
+import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 
 dotenv.config();
 
@@ -13,6 +14,10 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(
+  "/api/users",
+  userRoutes
+);
 
 app.get("/api/health", (req, res) => {
   res.json({
@@ -20,6 +25,8 @@ app.get("/api/health", (req, res) => {
     message: "Server running",
   });
 });
+
+app.use("/api/auth", authRoutes);
 
 const PORT = process.env.PORT || 5000;
 
