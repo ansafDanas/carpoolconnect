@@ -4,6 +4,8 @@ node_modules/
 # Environment Variables
 .env
 .env.local
+.env.test
+.env.*.local
 
 # Build Output
 dist/
@@ -12,6 +14,11 @@ build/
 # Logs
 logs/
 *.log
+
+# Local tool output captured during development
+*-log.txt
+pr-test.txt
+baseline*.txt
 
 # Coverage
 coverage/
@@ -22,3 +29,17 @@ Thumbs.db
 
 # VS Code
 .vscode/
+.kilo/
+
+# Local test artifacts
+server/vitest-output.txt
+server/vitest-report.json
+server/.tmp-vitest-output.txt
+
+# Visual QA tooling output (tools/shot.mjs, tools/scrollcheck.mjs)
+shots/
+.chrome-profile*/
+
+# Scratch output from locally running dev servers
+dev.err
+run.err

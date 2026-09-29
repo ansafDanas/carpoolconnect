@@ -1,111 +1,268 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   CarpoolConnect design system
+   ----------------------------------------------------------------------------
+   Product identity: a dependable everyday travel product. One confident blue
+   carries every primary action, amber marks ratings and optional extras, and
+   green is reserved for genuinely positive status. Surfaces are white on a
+   soft neutral canvas so the page reads calm, not decorated.
+   ============================================================================ */
+
+@theme {
+  /* ---- Brand: the action blue ------------------------------------------- */
+  --color-primary: #16233a; /* deep ink, for dark surfaces and headings */
+  --color-primary-hover: #24354f;
+  --color-primary-soft: #eef3fb;
+  --color-primary-ring: #1a73e8;
+
+  /* ---- Action colour: the one blue that means "do this" ------------------ */
+  --color-leaf: #1a73e8;
+  --color-leaf-hover: #1761c4;
+  --color-leaf-soft: #e8f0fe;
+  --color-accent: #1a73e8;
+  --color-accent-hover: #1761c4;
+  --color-accent-soft: #e8f0fe;
+
+  /* ---- Amber: ratings, optional extras, gentle warnings ------------------ */
+  --color-marigold: #f5a524;
+  --color-marigold-hover: #d98c0b;
+  --color-marigold-soft: #fef6e7;
+  --color-lime: #f5a524;
+  --color-lime-hover: #d98c0b;
+  --color-lime-soft: #fef6e7;
+
+  /* ---- Supporting hues, used sparingly and only semantically ----------- */
+  --color-clay: #c2410c;
+  --color-clay-hover: #9a3412;
+  --color-clay-soft: #ffedd5;
+
+  --color-sky: #0369a1;
+  --color-sky-hover: #025480;
+  --color-sky-soft: #e0f2fe;
+  --color-violet: #0369a1;
+  --color-violet-soft: #e0f2fe;
+
+  /* ---- Surfaces & text -------------------------------------------------- */
+  --color-background: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f4f8;
+  --color-text: #111827;
+  --color-text-muted: #6b7280;
+  --color-border: #e5e9f0;
+  --color-ring: #1a73e8;
+
+  /* ---- Status ------------------------------------------------------------ */
+  --color-success: #0f9d58;
+  --color-success-soft: #e7f6ee;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-info: #1a73e8;
+  --color-info-soft: #e8f0fe;
+
+  /* ---- Typography -------------------------------------------------------- */
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-heading: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  /* ---- Radii: crisp and product-like, never pill-shaped by default ----- */
+  --radius-xl: 0.75rem;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1rem;
+  --radius-4xl: 1.5rem;
+
+  /* ---- Elevation: present but quiet -------------------------------------- */
+  --shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-elevated: 0 4px 8px rgba(16, 24, 40, 0.06), 0 12px 28px rgba(16, 24, 40, 0.1);
+  --shadow-glow: 0 8px 24px rgba(26, 115, 232, 0.22);
+
+  --animate-fade-in: cc-fade-in 0.18s ease-out;
+  --animate-slide-up: cc-slide-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-shimmer: cc-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes cc-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cc-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cc-shimmer {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--color-text);
+  background: var(--color-background);
+  font-family: var(--font-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+* {
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+html {
+  min-width: 320px;
+  scroll-behavior: smooth;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
+body {
+  min-width: 320px;
+  min-height: 100vh;
   margin: 0;
+  background: var(--color-background);
 }
 
-code,
-.counter {
-  font-family: var(--mono);
+/* Horizontal overflow is prevented structurally: the app shell is a flex row
+   whose content column is allowed to shrink (min-w-0) and every grid track
+   uses minmax(0, ...). `overflow-x: hidden` is deliberately NOT set here --
+   it would mask a genuine layout bug instead of fixing it. */
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+select,
+input[type="button"],
+input[type="submit"] {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: var(--color-primary);
+  background: var(--color-marigold);
+}
+
+#root {
+  min-height: 100svh;
+  isolation: isolate;
+}
+
+/* Tailwind preflight zeroes this; the Leaflet pin needs it back. */
+.cc-pin {
+  background: transparent;
+  border: 0;
+}
+
+.cc-pin__dot {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 9999px;
+  background: var(--color-leaf);
+  border: 3px solid #fff;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.28);
+}
+
+/* Origin and destination are told apart the way a printed map tells them
+   apart: the pickup end is the product blue, the drop-off end is red. */
+.cc-pin__dot--to {
+  background: #e53935;
+}
+
+/* Leaflet's own zoom control, restyled to match the rest of the product. */
+.leaflet-control-zoom {
+  border: 1px solid var(--color-border) !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.leaflet-control-zoom a {
+  width: 30px !important;
+  height: 30px !important;
+  line-height: 30px !important;
+  color: var(--color-text) !important;
+  background: var(--color-surface) !important;
+  border-bottom-color: var(--color-border) !important;
+  font-size: 17px !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: var(--color-surface-muted) !important;
+}
+
+.leaflet-container {
+  font: inherit;
+  z-index: 0;
+  background: #eef1f5;
+}
+
+.leaflet-container a {
+  color: var(--color-leaf);
+}
+
+/* Rating is trust-critical here, so it gets one loud, consistent treatment
+   wherever a person is shown. */
+.rating-chip {
   display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.rating-high { background: var(--color-success-soft); color: #0b7a44; }
+.rating-mid { background: var(--color-warning-soft); color: #92400e; }
+.rating-low { background: var(--color-danger-soft); color: #b91c1c; }
+.rating-new { background: var(--color-surface-muted); color: var(--color-text-muted); }
+
+/* Loading skeletons */
+.cc-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(22, 33, 29, 0.06) 25%,
+    rgba(22, 33, 29, 0.1) 37%,
+    rgba(22, 33, 29, 0.06) 63%
+  );
+  background-size: 400% 100%;
+  animation: var(--animate-shimmer);
+  border-radius: 0.5rem;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+/* Honour reduced-motion preferences across every animation in the app. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
+
