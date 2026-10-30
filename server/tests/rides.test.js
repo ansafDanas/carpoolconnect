@@ -1,6 +1,6 @@
 import request from "supertest";
 import { describe, it, expect } from "vitest";
-import { app, generateToken, User, Ride, createdUserIds, createdRideIds, makeUniqueEmail } from "./setup.js";
+import { app, generateToken, User, Ride, Booking, createdUserIds, createdRideIds, createdBookingIds, makeUniqueEmail } from "./setup.js";
 
 describe("Ride API", () => {
   it("authenticated user can create a ride", async () => {
@@ -370,5 +370,342 @@ describe("Ride API", () => {
     const missingResponse = await request(app).get(`/api/rides/${validButMissingId}`);
     expect(missingResponse.status).toBe(404);
     expect(missingResponse.body.message).toMatch(/ride not found/i);
+  });
+
+  it("valid route edit updates coordinates, distance, and fuel calculations", async () => {
+    const email = makeUniqueEmail("route-edit");
+    const user = await User.create({
+      name: "Route Editor",
+      email,
+      password: "secret123",
+      role: "driver",
+    });
+    createdUserIds.push(user._id);
+
+    const ride = await Ride.create({
+      driver: user._id,
+      source: "Old Source",
+      destination: "Old Dest",
+      date: new Date(Date.now() + 86400000),
+      seatsAvailable: 2,
+      price: 150,
+      vehicle: "Car",
+      status: "active",
+      distanceKm: 10,
+      fuelCost: 71,
+      fuelPriceAtPosting: 107,
+    });
+    createdRideIds.push(ride._id);
+
+    const token = generateToken(user._id);
+    const response = await request(app)
+      .patch(`/api/rides/${ride._id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        source: "New Source",
+        destination: "New Dest",
+        sourceCoordinates: { latitude: 9.9312, longitude: 76.2673 },
+        destinationCoordinates: { latitude: 9.95, longitude: 76.30 },
+        distanceKm: 10,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.ride.source).toBe("New Source");
+    expect(response.body.ride.destination).toBe("New Dest");
+    expect(response.body.ride.sourcePoint).toBeTruthy();
+    expect(response.body.ride.destinationPoint).toBeTruthy();
+    expect(response.body.ride.distanceKm).toBeGreaterThan(0);
+    expect(response.body.ride.fuelCost).toBeGreaterThan(0);
+    expect(response.body.ride.fuelPriceAtPosting).toBeGreaterThan(0);
+  });
+
+  it("invalid source coordinates are rejected", async () => {
+    const email = makeUniqueEmail("route-invalid-src");
+    const user = await User.create({
+      name: "Route Invalid User",
+      email,
+      password: "secret123",
+      role: "driver",
+    });
+    createdUserIds.push(user._id);
+
+    const ride = await Ride.create({
+      driver: user._id,
+      source: "Old Source",
+      destination: "Old Dest",
+      date: new Date(Date.now() + 86400000),
+      seatsAvailable: 2,
+      price: 150,
+      vehicle: "Car",
+      status: "active",
+    });
+    createdRideIds.push(ride._id);
+
+    const token = generateToken(user._id);
+    const response = await request(app)
+      .patch(`/api/rides/${ride._id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        sourceCoordinates: { latitude: 999, longitude: 76.2673 },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/source coordinates are invalid/i);
+  });
+
+  it("invalid destination coordinates are rejected", async () => {
+    const email = makeUniqueEmail("route-invalid-dst");
+    const user = await User.create({
+      name: "Route Invalid User",
+      email,
+      password: "secret123",
+      role: "driver",
+    });
+    createdUserIds.push(user._id);
+
+    const ride = await Ride.create({
+      driver: user._id,
+      source: "Old Source",
+      destination: "Old Dest",
+      date: new Date(Date.now() + 86400000),
+      seatsAvailable: 2,
+      price: 150,
+      vehicle: "Car",
+      status: "active",
+    });
+    createdRideIds.push(ride._id);
+
+    const token = generateToken(user._id);
+    const response = await request(app)
+      .patch(`/api/rides/${ride._id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        destinationCoordinates: { latitude: 999, longitude: 76.2673 },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/destination coordinates are invalid/i);
+  });
+
+  it("inconsistent route distance is rejected", async () => {
+    const email = makeUniqueEmail("route-inconsistent");
+    const user = await User.create({
+      name: "Route Inconsistent User",
+      email,
+      password: "secret123",
+      role: "driver",
+    });
+    createdUserIds.push(user._id);
+
+    const ride = await Ride.create({
+      driver: user._id,
+      source: "Old Source",
+      destination: "Old Dest",
+      date: new Date(Date.now() + 86400000),
+      seatsAvailable: 2,
+      price: 150,
+      vehicle: "Car",
+      status: "active",
+    });
+    createdRideIds.push(ride._id);
+
+    const token = generateToken(user._id);
+    const response = await request(app)
+      .patch(`/api/rides/${ride._id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        sourceCoordinates: { latitude: 9.9312, longitude: 76.2673 },
+        destinationCoordinates: { latitude: 11.0126, longitude: 76.9596 },
+        distanceKm: 1,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBeTruthy();
+  });
+
+  it("non-route edit does not recalculate fuel values", async () => {
+    const email = makeUniqueEmail("route-no-change");
+    const user = await User.create({
+      name: "Route No Change User",
+      email,
+      password: "secret123",
+      role: "driver",
+    });
+    createdUserIds.push(user._id);
+
+    const ride = await Ride.create({
+      driver: user._id,
+      source: "Old Source",
+      destination: "Old Dest",
+      date: new Date(Date.now() + 86400000),
+      seatsAvailable: 2,
+      price: 150,
+      vehicle: "Car",
+      status: "active",
+      distanceKm: 10,
+      fuelCost: 71,
+      fuelPriceAtPosting: 107,
+    });
+    createdRideIds.push(ride._id);
+
+    const token = generateToken(user._id);
+    const response = await request(app)
+      .patch(`/api/rides/${ride._id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        seatsAvailable: 4,
+        price: 200,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.ride.seatsAvailable).toBe(4);
+    expect(response.body.ride.price).toBe(200);
+    expect(response.body.ride.distanceKm).toBe(10);
+    expect(response.body.ride.fuelCost).toBe(71);
+    expect(response.body.ride.fuelPriceAtPosting).toBe(107);
+  });
+
+  it("client cannot overwrite server-calculated fuel fields", async () => {
+    const email = makeUniqueEmail("route-fuel-override");
+    const user = await User.create({
+      name: "Route Fuel Override User",
+      email,
+      password: "secret123",
+      role: "driver",
+    });
+    createdUserIds.push(user._id);
+
+    const ride = await Ride.create({
+      driver: user._id,
+      source: "Old Source",
+      destination: "Old Dest",
+      date: new Date(Date.now() + 86400000),
+      seatsAvailable: 2,
+      price: 150,
+      vehicle: "Car",
+      status: "active",
+      distanceKm: 10,
+      fuelCost: 71,
+      fuelPriceAtPosting: 107,
+    });
+    createdRideIds.push(ride._id);
+
+    const token = generateToken(user._id);
+    const response = await request(app)
+      .patch(`/api/rides/${ride._id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        fuelCost: 99999,
+        fuelPriceAtPosting: 999,
+        distanceKm: 999,
+        seatsAvailable: 3,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.ride.seatsAvailable).toBe(3);
+    expect(response.body.ride.fuelCost).not.toBe(99999);
+    expect(response.body.ride.fuelPriceAtPosting).not.toBe(999);
+    expect(response.body.ride.distanceKm).not.toBe(999);
+  });
+
+  it("route change is rejected when confirmed bookings exist", async () => {
+    const email = makeUniqueEmail("route-booking");
+    const driver = await User.create({
+      name: "Route Booking Driver",
+      email,
+      password: "secret123",
+      role: "driver",
+    });
+    createdUserIds.push(driver._id);
+
+    const passenger = await User.create({
+      name: "Route Booking Passenger",
+      email: makeUniqueEmail("route-booking-pass"),
+      password: "secret123",
+      role: "passenger",
+    });
+    createdUserIds.push(passenger._id);
+
+    const ride = await Ride.create({
+      driver: driver._id,
+      source: "Old Source",
+      destination: "Old Dest",
+      date: new Date(Date.now() + 86400000),
+      seatsAvailable: 2,
+      price: 150,
+      vehicle: "Car",
+      status: "active",
+    });
+    createdRideIds.push(ride._id);
+
+    const booking = await Booking.create({
+      passenger: passenger._id,
+      ride: ride._id,
+      seats: 1,
+      status: "confirmed",
+      fuelShare: 50,
+      coffeeAmount: 0,
+      contributionAmount: 50,
+      paymentStatus: "unpaid",
+    });
+    createdBookingIds.push(booking._id);
+
+    const token = generateToken(driver._id);
+    const response = await request(app)
+      .patch(`/api/rides/${ride._id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        source: "New Source",
+        destination: "New Dest",
+        sourceCoordinates: { latitude: 9.9312, longitude: 76.2673 },
+        destinationCoordinates: { latitude: 9.95, longitude: 76.30 },
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/existing bookings/i);
+  });
+
+  it("unrelated user cannot modify another driver's ride after route edit", async () => {
+    const driverEmail = makeUniqueEmail("route-other-driver");
+    const driver = await User.create({
+      name: "Other Driver",
+      email: driverEmail,
+      password: "secret123",
+      role: "driver",
+    });
+    createdUserIds.push(driver._id);
+
+    const otherDriverEmail = makeUniqueEmail("route-other-driver-2");
+    const otherDriver = await User.create({
+      name: "Another Driver",
+      email: otherDriverEmail,
+      password: "secret123",
+      role: "driver",
+    });
+    createdUserIds.push(otherDriver._id);
+
+    const ride = await Ride.create({
+      driver: driver._id,
+      source: "Other Source",
+      destination: "Other Dest",
+      date: new Date(Date.now() + 172800000),
+      seatsAvailable: 2,
+      price: 120,
+      vehicle: "Bike",
+      status: "active",
+    });
+    createdRideIds.push(ride._id);
+
+    const token = generateToken(otherDriver._id);
+    const response = await request(app)
+      .patch(`/api/rides/${ride._id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        source: "Changed Source",
+        sourceCoordinates: { latitude: 9.9312, longitude: 76.2673 },
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toMatch(/only update your own rides/i);
   });
 });

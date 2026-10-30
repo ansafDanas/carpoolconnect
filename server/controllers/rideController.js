@@ -367,7 +367,13 @@ export const updateRide = async (req, res) => {
       }
     });
 
-    if (Object.keys(updates).length === 0) {
+    const routeChanged =
+      updates.source !== undefined ||
+      updates.destination !== undefined ||
+      req.body.sourceCoordinates !== undefined ||
+      req.body.destinationCoordinates !== undefined;
+
+    if (Object.keys(updates).length === 0 && !routeChanged) {
       return res.status(400).json({
         message: "No valid ride fields provided",
       });
@@ -384,6 +390,97 @@ export const updateRide = async (req, res) => {
     if (typeof updates.source === "string") updates.source = updates.source.trim();
     if (typeof updates.destination === "string") updates.destination = updates.destination.trim();
     if (typeof updates.vehicle === "string") updates.vehicle = updates.vehicle.trim();
+
+    if (routeChanged) {
+      // Reject route changes when bookings exist — we cannot silently alter
+      // confirmed contribution amounts without an explicit product rule.
+      const existingBookings = await Booking.find({
+        ride: ride._id,
+        status: { $in: ["pending", "confirmed"] },
+      });
+
+      if (existingBookings.length > 0) {
+        return res.status(400).json({
+          message: "Cannot change route on a ride with existing bookings",
+        });
+      }
+
+      // Resolve coordinates: use new values if provided, otherwise keep existing
+      const newSourcePoint =
+        req.body.sourceCoordinates !== undefined
+          ? toPoint(req.body.sourceCoordinates)
+          : ride.sourcePoint;
+      const newDestinationPoint =
+        req.body.destinationCoordinates !== undefined
+          ? toPoint(req.body.destinationCoordinates)
+          : ride.destinationPoint;
+
+      // Validate new coordinates if provided
+      if (req.body.sourceCoordinates !== undefined && !newSourcePoint) {
+        return res.status(400).json({
+          message: "Source coordinates are invalid",
+        });
+      }
+
+      if (req.body.destinationCoordinates !== undefined && !newDestinationPoint) {
+        return res.status(400).json({
+          message: "Destination coordinates are invalid",
+        });
+      }
+
+      // Resolve text values
+      const newSource =
+        updates.source !== undefined ? updates.source : ride.source;
+      const newDestination =
+        updates.destination !== undefined ? updates.destination : ride.destination;
+
+      // Validate pins against named places
+      const startCheck = validatePin({ text: newSource, point: newSourcePoint });
+      if (!startCheck.ok) {
+        return res.status(400).json({ message: startCheck.reason });
+      }
+
+      const endCheck = validatePin({
+        text: newDestination,
+        point: newDestinationPoint,
+      });
+      if (!endCheck.ok) {
+        return res.status(400).json({ message: endCheck.reason });
+      }
+
+      // Validate declared distance against pin straight-line distance
+      const declaredKm =
+        updates.distanceKm !== undefined ? updates.distanceKm : ride.distanceKm;
+      const distanceCheck = validateDistanceConsistency({
+        startPoint: newSourcePoint,
+        endPoint: newDestinationPoint,
+        distanceKm: declaredKm,
+      });
+      if (!distanceCheck.ok) {
+        return res.status(400).json({ message: distanceCheck.reason });
+      }
+
+      // Recalculate honest fuel cost using driver's mileage and current price
+      const driver = await User.findById(req.user._id).select(
+        "vehicleInfo.mileageKmpl"
+      );
+      const mileage = driver?.vehicleInfo?.mileageKmpl || 15;
+      const fuel = await getFuelPrice({});
+      const fuelMath = calculateFuelCost({
+        distanceKm: Number(declaredKm) || 0,
+        mileageKmpl: mileage,
+        petrolPrice: fuel.petrol,
+      });
+
+      // Apply route updates directly to the ride (not client-assignable)
+      ride.source = newSource;
+      ride.destination = newDestination;
+      ride.sourcePoint = newSourcePoint ?? undefined;
+      ride.destinationPoint = newDestinationPoint ?? undefined;
+      ride.distanceKm = fuelMath.distanceKm;
+      ride.fuelCost = fuelMath.fuelCost;
+      ride.fuelPriceAtPosting = fuelMath.petrolPrice;
+    }
 
     const previousStatus = ride.status;
 
