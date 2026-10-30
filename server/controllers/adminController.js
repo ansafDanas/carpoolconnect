@@ -312,50 +312,9 @@ export const cancelRideAsAdmin = async (req, res) => {
       });
     }
 
-    const activeBookings = await Booking.find({
-      ride: ride._id,
-      status: { $in: ["pending", "confirmed"] },
-    });
-
-    const seatsToRestore = activeBookings.reduce(
-      (total, booking) => total + (booking.seats || 1),
-      0
-    );
-
-    ride.status = "cancelled";
-    ride.trackingActive = false;
-    if (seatsToRestore > 0) {
-      ride.seatsAvailable += seatsToRestore;
-    }
-    await ride.save();
-
-    await Promise.allSettled(
-      activeBookings.map(async (booking) => {
-        booking.status = "cancelled";
-        await booking.save();
-
-        const passenger = await User.findById(booking.passenger).select("name email");
-
-        await sendRideCancellationEmail({
-          passengerEmail: passenger?.email,
-          passengerName: passenger?.name,
-          driverName: ride.driver?.name || "Driver",
-          source: ride.source,
-          destination: ride.destination,
-          date: ride.date,
-          seats: booking.seats,
-          rideReference: ride._id.toString(),
-        });
-
-        return createNotification({
-          recipient: booking.passenger,
-          type: "ride_cancelled",
-          title: "Ride cancelled",
-          message: "A ride you booked has been cancelled.",
-          relatedRide: ride._id,
-          relatedBooking: booking._id,
-        });
-      })
+    const cleanupResult = await cancelRideWithCleanup(
+      ride,
+      ride.driver?.name || "Driver"
     );
 
     await ride.populate("driver", "_id name email roles rating");
@@ -364,7 +323,7 @@ export const cancelRideAsAdmin = async (req, res) => {
       success: true,
       message: "Ride cancelled successfully",
       ride,
-      cancelledBookingCount: activeBookings.length,
+      cancelledBookingCount: cleanupResult.cancelledBookingCount,
     });
   } catch (error) {
     console.error("Admin ride cancellation error:", error);
