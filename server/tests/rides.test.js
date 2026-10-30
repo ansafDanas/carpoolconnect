@@ -123,6 +123,8 @@ describe("Ride API", () => {
     expect(response.status).toBe(200);
     expect(response.body.count).toBeGreaterThanOrEqual(1);
     expect(response.body.rides.some((item) => item._id.toString() === ride._id.toString())).toBe(true);
+    // Public ride list must not expose driver email
+    expect(response.body.rides.every((item) => !item.driver?.email)).toBe(true);
   });
 
   it("GET /api/rides/:id returns the correct ride", async () => {
@@ -153,6 +155,8 @@ describe("Ride API", () => {
     expect(response.body.ride._id.toString()).toBe(ride._id.toString());
     expect(response.body.ride.source).toBe(ride.source);
     expect(response.body.ride.destination).toBe(ride.destination);
+    // Public ride detail must not expose driver email
+    expect(response.body.ride.driver.email).toBeUndefined();
   });
 
   it("authenticated driver can update their own ride", async () => {

@@ -243,7 +243,7 @@ export const getRides = async (req, res) => {
     }
 
     const rides = await Ride.find(filters)
-      .populate("driver", "name email")
+      .populate("driver", "name")
       .sort({ date: 1 });
 
     res.status(200).json({
@@ -291,7 +291,7 @@ export const getRideById = async (req, res) => {
 
     const ride = await Ride.findById(id).populate(
       "driver",
-      "name email"
+      "name"
     );
 
     if (!ride) {
