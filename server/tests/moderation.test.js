@@ -1,15 +1,26 @@
 import request from "supertest";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   app,
   generateToken,
   User,
   Ride,
+  Booking,
+  RideRequest,
+  Notification,
   Report,
   createdUserIds,
   createdRideIds,
+  createdBookingIds,
   makeUniqueEmail,
 } from "./setup.js";
+
+vi.mock("../services/emailService.js", () => ({
+  sendRideCancellationEmail: vi.fn().mockResolvedValue({ success: true }),
+  sendRideCompletionEmail: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+import { sendRideCancellationEmail } from "../services/emailService.js";
 
 const HOUR = 3600000;
 
@@ -136,6 +147,81 @@ describe("Safety report moderation", () => {
       .send({ action: "suspended" });
 
     expect((await Ride.findById(ride._id)).status).toBe("cancelled");
+  });
+
+  it("suspending a driver cancels active rides with full cleanup", async () => {
+    const admin = await makeAdmin();
+    const reporter = await makeUser();
+    const reported = await makeUser(["driver"]);
+
+    const ride = await Ride.create({
+      driver: reported._id,
+      source: "A",
+      destination: "B",
+      date: new Date(Date.now() + 24 * HOUR),
+      seatsAvailable: 3,
+      price: 0,
+      status: "active",
+    });
+    createdRideIds.push(ride._id);
+
+    const booking = await Booking.create({
+      passenger: reporter._id,
+      ride: ride._id,
+      seats: 2,
+      status: "confirmed",
+      fuelShare: 100,
+      coffeeAmount: 0,
+      contributionAmount: 100,
+      paymentStatus: "unpaid",
+    });
+    createdBookingIds.push(booking._id);
+
+    const rideRequest = await RideRequest.create({
+      rider: reporter._id,
+      pickup: "A",
+      drop: "B",
+      earliestTime: new Date(Date.now() + 24 * HOUR),
+      latestTime: new Date(Date.now() + 25 * HOUR),
+      seats: 1,
+      status: "matched",
+      matchedRide: ride._id,
+    });
+
+    const report = await makeReport(reporter, reported, "unsafe_behaviour");
+
+    await request(app)
+      .patch(`/api/admin/reports/${report._id}`)
+      .set("Authorization", `Bearer ${generateToken(admin._id)}`)
+      .send({ action: "suspended" });
+
+    // Ride cancelled and tracking deactivated
+    const storedRide = await Ride.findById(ride._id);
+    expect(storedRide.status).toBe("cancelled");
+    expect(storedRide.trackingActive).toBe(false);
+
+    // Seats restored: 3 original + 2 from booking = 5
+    expect(storedRide.seatsAvailable).toBe(5);
+
+    // Booking cancelled
+    const storedBooking = await Booking.findById(booking._id);
+    expect(storedBooking.status).toBe("cancelled");
+
+    // Ride-request reopened and matchedRide cleared
+    const storedRequest = await RideRequest.findById(rideRequest._id);
+    expect(storedRequest.status).toBe("open");
+    expect(storedRequest.matchedRide).toBeUndefined();
+
+    // Notification created for passenger
+    const notification = await Notification.findOne({
+      recipient: reporter._id,
+      type: "ride_cancelled",
+      relatedRide: ride._id,
+    });
+    expect(notification).toBeTruthy();
+
+    // Cancellation email attempted
+    expect(sendRideCancellationEmail).toHaveBeenCalled();
   });
 
   it("an admin cannot suspend another admin account", async () => {

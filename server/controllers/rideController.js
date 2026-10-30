@@ -508,6 +508,71 @@ export const updateRide = async (req, res) => {
   }
 };
 
+export const cancelRideWithCleanup = async (ride, driverName = "Driver") => {
+  if (ride.status !== "active") {
+    return { cancelledBookingCount: 0 };
+  }
+
+  const activeBookings = await Booking.find({
+    ride: ride._id,
+    status: { $in: ["pending", "confirmed"] },
+  });
+
+  const seatsToRestore = activeBookings.reduce(
+    (total, booking) => total + (booking.seats || 1),
+    0
+  );
+
+  ride.status = "cancelled";
+  ride.trackingActive = false;
+  if (seatsToRestore > 0) {
+    ride.seatsAvailable += seatsToRestore;
+  }
+  await ride.save();
+
+  // Release any request that was matched to this ride, so no rider is left
+  // holding a "matched" reference to a trip that will not run.
+  await RideRequest.updateMany(
+    { matchedRide: ride._id, status: "matched" },
+    { $set: { status: "open" }, $unset: { matchedRide: 1 } }
+  );
+
+  await Promise.allSettled(
+    activeBookings.map(async (booking) => {
+      booking.status = "cancelled";
+      await booking.save();
+
+      const passenger = await User.findById(booking.passenger).select("name email");
+
+      try {
+        await sendRideCancellationEmail({
+          passengerEmail: passenger?.email,
+          passengerName: passenger?.name,
+          driverName,
+          source: ride.source,
+          destination: ride.destination,
+          date: ride.date,
+          seats: booking.seats,
+          rideReference: ride._id.toString(),
+        });
+      } catch (e) {
+        console.error("Cancellation email error:", e);
+      }
+
+      return createNotification({
+        recipient: booking.passenger,
+        type: "ride_cancelled",
+        title: "Ride cancelled",
+        message: "A ride you booked has been cancelled.",
+        relatedRide: ride._id,
+        relatedBooking: booking._id,
+      });
+    })
+  );
+
+  return { cancelledBookingCount: activeBookings.length };
+};
+
 export const deleteRide = async (req, res) => {
   try {
     const { id } = req.params;
@@ -544,62 +609,7 @@ export const deleteRide = async (req, res) => {
       });
     }
 
-    const activeBookings = await Booking.find({
-      ride: ride._id,
-      status: { $in: ["active", "pending", "confirmed"] },
-    });
-
-    const seatsToRestore = activeBookings.reduce(
-      (total, booking) => total + (booking.seats || 1),
-      0
-    );
-
-    ride.status = "cancelled";
-    ride.trackingActive = false;
-    if (seatsToRestore > 0) {
-      ride.seatsAvailable += seatsToRestore;
-    }
-    await ride.save();
-
-    // Release any request that was matched to this ride, so no rider is left
-    // holding a "matched" reference to a trip that will not run.
-    await RideRequest.updateMany(
-      { matchedRide: ride._id, status: "matched" },
-      { $set: { status: "open" }, $unset: { matchedRide: 1 } }
-    );
-
-    await Promise.allSettled(
-      activeBookings.map(async (booking) => {
-        booking.status = "cancelled";
-        await booking.save();
-
-        const passenger = await User.findById(booking.passenger).select("name email");
-
-        try {
-          await sendRideCancellationEmail({
-            passengerEmail: passenger?.email,
-            passengerName: passenger?.name,
-            driverName: req.user?.name || "Driver",
-            source: ride.source,
-            destination: ride.destination,
-            date: ride.date,
-            seats: booking.seats,
-            rideReference: ride._id.toString(),
-          });
-        } catch (e) {
-          console.error("Cancellation email error:", e);
-        }
-
-        return createNotification({
-          recipient: booking.passenger,
-          type: "ride_cancelled",
-          title: "Ride cancelled",
-          message: "A ride you booked has been cancelled.",
-          relatedRide: ride._id,
-          relatedBooking: booking._id,
-        });
-      })
-    );
+    const cleanupResult = await cancelRideWithCleanup(ride, req.user?.name || "Driver");
 
     await ride.populate("driver", "name email");
 
@@ -607,7 +617,7 @@ export const deleteRide = async (req, res) => {
       message: "Ride cancelled successfully",
       ride,
       rideId: id,
-      cancelledBookingCount: activeBookings.length,
+      cancelledBookingCount: cleanupResult.cancelledBookingCount,
     });
   } catch (error) {
     console.error("Delete ride error:", error);

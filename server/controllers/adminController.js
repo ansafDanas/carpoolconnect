@@ -4,6 +4,7 @@ import Report from "../models/Report.js";
 import User from "../models/User.js";
 import { sendRideCancellationEmail } from "../services/emailService.js";
 import { createNotification } from "./notificationController.js";
+import { cancelRideWithCleanup } from "./rideController.js";
 
 const isValidId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
 
@@ -101,10 +102,10 @@ export const resolveReport = async (req, res) => {
       await reported.save();
 
       // Close out anything they had in flight so riders are not stranded.
-      await Ride.updateMany(
-        { driver: reported._id, status: "active" },
-        { $set: { status: "cancelled", trackingActive: false } }
-      );
+      const rides = await Ride.find({ driver: reported._id, status: "active" });
+      for (const ride of rides) {
+        await cancelRideWithCleanup(ride, ride.driver?.name || "Driver");
+      }
     } else if (action === "warned") {
       await createNotification({
         recipient: reported._id,
